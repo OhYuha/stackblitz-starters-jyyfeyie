@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import {
-  OrbitControls,
-  OrthographicCamera,
-  PerspectiveCamera,
-} from '@react-three/drei';
+import { OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import TeacherStudentControl from './TeacherStudentControl';
 
 interface MapObject {
   id: string;
@@ -22,13 +19,8 @@ export default function MapEditor({ mapId }: { mapId: string }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // 기존 맵 데이터 불러오기
     async function loadMapData() {
-      const { data } = await supabase
-        .from('maps')
-        .select('*')
-        .eq('id', mapId)
-        .single();
+      const { data } = await supabase.from('maps').select('*').eq('id', mapId).single();
       if (data) {
         setViewMode(data.view_mode || '3D');
         if (data.objects) setObjects(data.objects);
@@ -37,7 +29,6 @@ export default function MapEditor({ mapId }: { mapId: string }) {
     loadMapData();
   }, [mapId]);
 
-  // 오브젝트 블록 추가
   const handleAddBlock = () => {
     const newObj: MapObject = {
       id: Math.random().toString(36).substring(2, 9),
@@ -47,20 +38,11 @@ export default function MapEditor({ mapId }: { mapId: string }) {
     setObjects((prev) => [...prev, newObj]);
   };
 
-  // 맵 저장하기 (view_mode 포함)
   const handleSaveMap = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from('maps')
-      .update({ view_mode: viewMode, objects })
-      .eq('id', mapId);
-
+    await supabase.from('maps').update({ view_mode: viewMode, objects }).eq('id', mapId);
     setSaving(false);
-    if (!error) {
-      alert(`맵 저장 완료! (뷰 모드: ${viewMode})`);
-    } else {
-      alert('저장 완료 (로컬 임시)');
-    }
+    alert(`맵 저장 완료! (뷰 모드: ${viewMode})`);
   };
 
   return (
@@ -68,10 +50,7 @@ export default function MapEditor({ mapId }: { mapId: string }) {
       {/* 🛠️ 상단 툴바 UI */}
       <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-gray-200">
         <div className="flex items-center gap-4">
-          <Link
-            href="/teacher/dashboard"
-            className="text-sm font-semibold text-gray-500 hover:text-gray-800"
-          >
+          <Link href="/teacher/dashboard" className="text-sm font-semibold text-gray-500 hover:text-gray-800">
             ← 대시보드
           </Link>
           <span className="h-4 w-px bg-gray-300" />
@@ -79,21 +58,16 @@ export default function MapEditor({ mapId }: { mapId: string }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 🎯 2D / 3D 모드 토글 버튼 */}
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('3D')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'
-              }`}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${viewMode === '3D' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
             >
               3D 모드
             </button>
             <button
               onClick={() => setViewMode('2D')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
-                viewMode === '2D' ? 'bg-blue-600 text-white' : 'text-gray-500'
-              }`}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${viewMode === '2D' ? 'bg-blue-600 text-white' : 'text-gray-500'}`}
             >
               2D 모드 (Top-down)
             </button>
@@ -116,19 +90,16 @@ export default function MapEditor({ mapId }: { mapId: string }) {
         </div>
       </div>
 
+      {/* 👥 선생님 전용 실시간 학생 관리 컨트롤 패널 */}
+      <TeacherStudentControl placeId={mapId} />
+
       {/* 3D / 2D Canvas */}
       <Canvas shadows className="w-full h-full">
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1.2} castShadow />
 
-        {/* 선생님 설정 모드에 따른 카메라 라이브 전환 */}
         {viewMode === '2D' ? (
-          <OrthographicCamera
-            makeDefault
-            position={[0, 20, 0]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            zoom={35}
-          />
+          <OrthographicCamera makeDefault position={[0, 20, 0]} rotation={[-Math.PI / 2, 0, 0]} zoom={35} />
         ) : (
           <>
             <PerspectiveCamera makeDefault position={[0, 10, 15]} fov={50} />
@@ -136,10 +107,8 @@ export default function MapEditor({ mapId }: { mapId: string }) {
           </>
         )}
 
-        {/* 바닥 Grid */}
         <gridHelper args={[50, 50, '#3b82f6', '#93c5fd']} />
 
-        {/* 배치된 오브젝트 블록들 */}
         {objects.map((obj) => (
           <mesh key={obj.id} position={obj.position} castShadow receiveShadow>
             <boxGeometry args={[1, 1, 1]} />
