@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -10,23 +11,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
+  // 이메일/비밀번호 로그인 및 회원가입
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!captchaToken) {
+      alert('캡차 인증을 완료해 주세요.');
+      return;
+    }
+
     setLoading(true);
 
     if (isSignUp) {
-      // 회원가입
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          captchaToken, // 🛡️ Turnstile 캡차 토큰 전달
+        },
+      });
+
       if (error) {
         alert(`회원가입 실패: ${error.message}`);
       } else {
-        alert('회원가입이 완료되었습니다! 로그인해 주세요.');
+        alert('회원가입 완료! 로그인해 주세요.');
         setIsSignUp(false);
       }
     } else {
-      // 로그인
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: {
+          captchaToken, // 🛡️ Turnstile 캡차 토큰 전달
+        },
+      });
+
       if (error) {
         alert(`로그인 실패: ${error.message}`);
       } else {
@@ -46,6 +67,7 @@ export default function LoginPage() {
           무무록스 대시보드 접근을 위해 인증이 필요합니다.
         </p>
 
+        {/* ✉️ 이메일 로그인/회원가입 폼 */}
         <form onSubmit={handleAuth} className="flex flex-col gap-4">
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">이메일</label>
@@ -71,10 +93,19 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* 🛡️ Cloudflare Turnstile 위젯 */}
+          <div className="flex justify-center my-2">
+            <Turnstile
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
+              onSuccess={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+            />
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow disabled:bg-gray-300 mt-2"
+            disabled={loading || !captchaToken}
+            className="w-full py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow disabled:bg-gray-300"
           >
             {loading ? '처리 중...' : isSignUp ? '회원가입하기' : '로그인하기'}
           </button>
